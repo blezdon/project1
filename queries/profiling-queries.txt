@@ -132,7 +132,44 @@ LIMIT 10;
 
 
 # =============================================================================
-# SECTION D: Python profiling snippet (save as profile_cfi.py)
+# SECTION D: U0 / U1 / U2 use-case queries
+# =============================================================================
+
+-- D1. U0: Annual Pass vs Fail counts (zero cleaning needed)
+SELECT EXTRACT(YEAR FROM inspection_date) AS yr,
+       SUM(CASE WHEN results = 'Pass' THEN 1 ELSE 0 END) AS passes,
+       SUM(CASE WHEN results = 'Fail' THEN 1 ELSE 0 END) AS fails,
+       COUNT(*) AS total
+FROM inspections
+WHERE results IN ('Pass', 'Fail')
+GROUP BY yr
+ORDER BY yr;
+
+-- D2. U1 scope: operational Risk 1 restaurants 2023-2025
+SELECT COUNT(*) AS u1_rows
+FROM inspections
+WHERE risk = 'Risk 1 (High)'
+  AND facility_type = 'Restaurant'
+  AND inspection_date >= '2023-01-01'
+  AND inspection_date <= '2025-12-31'
+  AND results IN ('Pass', 'Fail', 'Pass w/ Conditions');
+
+-- D3. U1 Q1 naive (before cleaning — for S4 before/after demo)
+SELECT zip,
+       COUNT(*) AS n,
+       ROUND(100.0 * SUM(CASE WHEN results = 'Fail' THEN 1 ELSE 0 END) / COUNT(*), 2) AS fail_pct
+FROM inspections
+WHERE risk = 'Risk 1 (High)'
+  AND facility_type = 'Restaurant'
+  AND inspection_date >= '2023-01-01'
+  AND inspection_date <= '2025-12-31'
+GROUP BY zip
+ORDER BY fail_pct DESC
+LIMIT 10;
+
+
+# =============================================================================
+# SECTION E: Python profiling (scripts/profile_cfi.py)
 # =============================================================================
 # import pandas as pd
 # df = pd.read_csv("Food_Inspections.csv", low_memory=False)

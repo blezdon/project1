@@ -38,5 +38,23 @@ exclude non-operational results (Out of Business, Not Ready, No Entry, etc.).
 ### Next steps for team
 - Copy content into Phase-I PDF; add team ID, names, emails
 - Add OpenRefine screenshots for P1, P2, P3, P6
-- Complete Step 2 (U0, U1, U2) and Step 4 (Phase-II plan) in report
 - Download CSV snapshot from Box folder for local OpenRefine work
+
+2026-07-03 — Phase-I Steps 2 & 4 draft content created
+------------------------------------------------------
+
+### What was done
+1. Created docs/phase1-step2-use-cases.md
+   - U1 (main): ZIP failure rates + top violation codes for Risk 1 restaurants 2023-2025
+   - U0 (zero cleaning): annual Pass vs Fail counts — raw D is good enough
+   - U2 (never enough): real-time illness risk — requires data not in CFI
+2. Created docs/phase1-step4-phase2-plan.md
+   - Full S1-S5 workflow with OpenRefine + Python + SQL + YesWorkflow
+   - Task assignment template, timeline, IC test suite, change quantification table
+   - Mermaid outer workflow W1 diagram
+3. Created docs/phase1-report-outline.md — master checklist for full Phase-I PDF
+4. Created scripts/profile_cfi.py — profiling and optional cleaning pipeline
+5. Extended queries/profiling-queries.txt with U0/U1 use-case queries (Section D)
+
+### Phase-I status
+All four report sections now have draft content in docs/.
