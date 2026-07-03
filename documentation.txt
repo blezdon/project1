@@ -1,0 +1,78 @@
+CS 513 CFI Project — Agent Documentation Log
+=============================================
+
+2026-07-03 — Phase-I Steps 1 & 3 draft content created
+------------------------------------------------------
+
+### What was done
+1. Profiled live Chicago Food Inspection dataset via SODA API (312,740 rows).
+2. Created report-ready drafts:
+   - docs/phase1-step1-dataset-description.md
+   - docs/phase1-step3-data-quality.md
+   - queries/profiling-queries.txt
+
+### Key profiling results (July 3, 2026)
+- Date range: 2010-01-04 to 2026-07-02
+- Results: Pass 161,822 | Fail 60,224 | Pass w/ Conditions 46,459 | Out of Business 25,697
+- Missing facility_type: 5,347 (1.7%)
+- Missing violations (all rows): 87,956 (28.1%)
+- Fail without violations: 3,628 (IC violation)
+- Missing latitude: 1,035
+- Max duplicate group (license+date+result): 57 rows
+- Pass rows with violation text: 121,764 (domain nuance, not simple error)
+
+### Main use case U1 (defined for Step 3 linkage)
+Risk 1 restaurants, 2023–2025: failure rate by ZIP + top 10 violation codes;
+exclude non-operational results (Out of Business, Not Ready, No Entry, etc.).
+
+### Step 1 deliverables
+- Mermaid ER diagram (Establishment → Inspection → Violation)
+- 17-column raw schema table + normalized logical schema
+- Narrative: origin (CDPH), temporal/spatial extent, content summary, known limitations
+
+### Step 3 deliverables
+- 10 documented DQ problems (P1–P10) with live evidence snippets
+- Necessity/sufficiency argument tying problems to U1 queries Q1/Q2
+- Before/after SQL examples for naive vs cleaned analysis
+
+### Next steps for team
+- Copy content into Phase-I PDF; add team ID, names, emails
+- Add OpenRefine screenshots for P1, P2, P3, P6
+- Download CSV snapshot from Box folder for local OpenRefine work
+
+2026-07-03 — Phase-I Steps 2 & 4 draft content created
+------------------------------------------------------
+
+### What was done
+1. Created docs/phase1-step2-use-cases.md
+   - U1 (main): ZIP failure rates + top violation codes for Risk 1 restaurants 2023-2025
+   - U0 (zero cleaning): annual Pass vs Fail counts — raw D is good enough
+   - U2 (never enough): real-time illness risk — requires data not in CFI
+2. Created docs/phase1-step4-phase2-plan.md
+   - Full S1-S5 workflow with OpenRefine + Python + SQL + YesWorkflow
+   - Task assignment template, timeline, IC test suite, change quantification table
+   - Mermaid outer workflow W1 diagram
+3. Created docs/phase1-report-outline.md — master checklist for full Phase-I PDF
+4. Created scripts/profile_cfi.py — profiling and optional cleaning pipeline
+5. Extended queries/profiling-queries.txt with U0/U1 use-case queries (Section D)
+
+### Phase-I status
+All four report sections now have draft content in docs/.
+
+2026-07-03 — Awaiting team-provided CSV snapshot
+------------------------------------------------
+
+User will provide their own CFI dataset download when home for accurate profiling.
+Current statistics in docs/ are from live SODA API (July 3, 2026, 312,740 rows) and
+should be re-run on the provided snapshot before finalizing the Phase-I PDF.
+
+### When dataset is provided, re-run:
+1. scripts/profile_cfi.py on the CSV → update null counts, duplicates, U1 scope
+2. queries/profiling-queries.txt B1-B8 on local SQLite/Postgres load
+3. Update counts in phase1-step1, phase1-step3 if materially different
+4. Capture OpenRefine screenshots from the actual file
+5. Note download date + row count in report header
+
+### How to provide
+- Upload CSV to workspace, or share Box/Google Drive link
+- Include download date if known

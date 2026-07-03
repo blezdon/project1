@@ -1,0 +1,183 @@
+# CS 513 — Chicago Food Inspection (CFI) Profiling Queries
+# Dataset: https://data.cityofchicago.org/resource/4ijn-s7e5
+# Profiled: July 3, 2026
+# Use case U1: Risk 1 restaurant failure rates by ZIP (2023-2025) + top violation codes
+
+# =============================================================================
+# SECTION A: SODA API queries (run via browser or curl against live portal)
+# =============================================================================
+
+# A1. Total row count
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=count(*)%20as%20total
+
+# A2. Results distribution
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=results,count(*)%20as%20cnt&$group=results&$order=cnt%20DESC
+
+# A3. Date range
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=min(inspection_date)%20as%20min_date,max(inspection_date)%20as%20max_date
+
+# A4. Missing facility type
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=count(*)%20as%20missing_facility_type&$where=facility_type%20is%20null
+
+# A5. Missing violations (all rows)
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=count(*)%20as%20missing_violations&$where=violations%20is%20null
+
+# A6. Fail rows with null violations (IC violation)
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=count(*)%20as%20fail_no_violations&$where=results%20=%20'Fail'%20AND%20violations%20is%20null
+
+# A7. Pass w/ Conditions with null violations
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=count(*)%20as%20pwc_no_violations&$where=results%20=%20'Pass%20w/%20Conditions'%20AND%20violations%20is%20null
+
+# A8. Missing latitude
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=count(*)%20as%20missing_lat&$where=latitude%20is%20null
+
+# A9. Risk distribution
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=risk,count(*)%20as%20cnt&$group=risk&$order=cnt%20DESC
+
+# A10. Top facility types
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=facility_type,count(*)%20as%20cnt&$group=facility_type&$order=cnt%20DESC&$limit=15
+
+# A11. Duplicate license + date + result groups
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=license_,inspection_date,results,count(*)%20as%20cnt&$group=license_,inspection_date,results&$having=count(*)%20%3E%201&$order=cnt%20DESC&$limit=20
+
+# A12. Pass rows that still have violation text
+# https://data.cityofchicago.org/resource/4ijn-s7e5.json?$select=count(*)%20as%20pass_with_violations&$where=results%20=%20'Pass'%20AND%20violations%20is%20not%20null
+
+
+# =============================================================================
+# SECTION B: SQL queries (run on downloaded CSV loaded into SQLite/Postgres)
+# Table name assumed: inspections
+# =============================================================================
+
+-- B1. Column null-rate profile
+SELECT COUNT(*) AS total_rows,
+       SUM(CASE WHEN facility_type IS NULL OR TRIM(facility_type) = '' THEN 1 ELSE 0 END) AS missing_facility_type,
+       SUM(CASE WHEN aka_name IS NULL OR TRIM(aka_name) = '' THEN 1 ELSE 0 END) AS missing_aka_name,
+       SUM(CASE WHEN violations IS NULL OR TRIM(violations) = '' THEN 1 ELSE 0 END) AS missing_violations,
+       SUM(CASE WHEN latitude IS NULL THEN 1 ELSE 0 END) AS missing_latitude,
+       SUM(CASE WHEN risk IS NULL OR TRIM(risk) = '' THEN 1 ELSE 0 END) AS missing_risk
+FROM inspections;
+
+-- B2. Results value distribution
+SELECT results, COUNT(*) AS cnt,
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS pct
+FROM inspections
+GROUP BY results
+ORDER BY cnt DESC;
+
+-- B3. IC3 violation: Fail must have violations
+SELECT inspection_id, dba_name, license_, inspection_date, results
+FROM inspections
+WHERE results = 'Fail'
+  AND (violations IS NULL OR TRIM(violations) = '')
+LIMIT 25;
+
+-- B4. Non-operational results (should be excluded from U1)
+SELECT results, COUNT(*) AS cnt
+FROM inspections
+WHERE results IN ('Out of Business', 'No Entry', 'Not Ready', 'Business Not Located')
+GROUP BY results
+ORDER BY cnt DESC;
+
+-- B5. Duplicate detection on natural key
+SELECT license_, inspection_date, results, COUNT(*) AS dup_count
+FROM inspections
+GROUP BY license_, inspection_date, results
+HAVING COUNT(*) > 1
+ORDER BY dup_count DESC
+LIMIT 25;
+
+-- B6. Risk value anomalies
+SELECT risk, COUNT(*) AS cnt
+FROM inspections
+GROUP BY risk
+ORDER BY cnt DESC;
+
+-- B7. U1 scope check: Risk 1 restaurants in 2023-2025
+SELECT COUNT(*) AS u1_candidate_rows
+FROM inspections
+WHERE risk = 'Risk 1 (High)'
+  AND facility_type = 'Restaurant'
+  AND inspection_date >= '2023-01-01'
+  AND inspection_date <= '2025-12-31'
+  AND results NOT IN ('Out of Business', 'No Entry', 'Not Ready', 'Business Not Located');
+
+-- B8. NAIVE U1 Q1 (before cleaning — includes duplicates and wrong denominators)
+SELECT zip,
+       COUNT(*) AS total_inspections,
+       SUM(CASE WHEN results = 'Fail' THEN 1 ELSE 0 END) AS failures,
+       ROUND(100.0 * SUM(CASE WHEN results = 'Fail' THEN 1 ELSE 0 END) / COUNT(*), 2) AS fail_pct_naive
+FROM inspections
+WHERE risk = 'Risk 1 (High)'
+  AND facility_type = 'Restaurant'
+  AND inspection_date >= '2023-01-01'
+  AND inspection_date <= '2025-12-31'
+GROUP BY zip
+ORDER BY fail_pct_naive DESC
+LIMIT 10;
+
+
+# =============================================================================
+# SECTION C: Datalog / Logica-style denial constraints (Phase-II IC checks)
+# =============================================================================
+
+# DC1: Every inspection has a license number
+# Violation: inspection(L, _) :- inspection_row(L, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _), L = "".
+
+# DC2: Fail implies non-empty violations
+# Violation: fail_without_violation(ID) :- inspection(ID, _, _, _, "Fail", V), V = "".
+
+# DC3: Risk must be parseable
+# Violation: bad_risk(ID) :- inspection(ID, _, _, R, _, _), R not in {"Risk 1 (High)", "Risk 2 (Medium)", "Risk 3 (Low)"}.
+
+
+# =============================================================================
+# SECTION D: U0 / U1 / U2 use-case queries
+# =============================================================================
+
+-- D1. U0: Annual Pass vs Fail counts (zero cleaning needed)
+SELECT EXTRACT(YEAR FROM inspection_date) AS yr,
+       SUM(CASE WHEN results = 'Pass' THEN 1 ELSE 0 END) AS passes,
+       SUM(CASE WHEN results = 'Fail' THEN 1 ELSE 0 END) AS fails,
+       COUNT(*) AS total
+FROM inspections
+WHERE results IN ('Pass', 'Fail')
+GROUP BY yr
+ORDER BY yr;
+
+-- D2. U1 scope: operational Risk 1 restaurants 2023-2025
+SELECT COUNT(*) AS u1_rows
+FROM inspections
+WHERE risk = 'Risk 1 (High)'
+  AND facility_type = 'Restaurant'
+  AND inspection_date >= '2023-01-01'
+  AND inspection_date <= '2025-12-31'
+  AND results IN ('Pass', 'Fail', 'Pass w/ Conditions');
+
+-- D3. U1 Q1 naive (before cleaning — for S4 before/after demo)
+SELECT zip,
+       COUNT(*) AS n,
+       ROUND(100.0 * SUM(CASE WHEN results = 'Fail' THEN 1 ELSE 0 END) / COUNT(*), 2) AS fail_pct
+FROM inspections
+WHERE risk = 'Risk 1 (High)'
+  AND facility_type = 'Restaurant'
+  AND inspection_date >= '2023-01-01'
+  AND inspection_date <= '2025-12-31'
+GROUP BY zip
+ORDER BY fail_pct DESC
+LIMIT 10;
+
+
+# =============================================================================
+# SECTION E: Python profiling (scripts/profile_cfi.py)
+# =============================================================================
+# import pandas as pd
+# df = pd.read_csv("Food_Inspections.csv", low_memory=False)
+# print("Shape:", df.shape)
+# print("\nNull counts:\n", df.isnull().sum())
+# print("\nResults:\n", df['Results'].value_counts())
+# print("\nFail without violations:",
+#       ((df['Results']=='Fail') & df['Violations'].isna()).sum())
+# dup = df.groupby(['License #','Inspection Date','Results']).size()
+# print("\nMax duplicate group size:", dup.max())
+# print("Duplicate groups >1:", (dup > 1).sum())
