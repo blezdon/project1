@@ -58,3 +58,21 @@ exclude non-operational results (Out of Business, Not Ready, No Entry, etc.).
 
 ### Phase-I status
 All four report sections now have draft content in docs/.
+
+2026-07-03 — Awaiting team-provided CSV snapshot
+------------------------------------------------
+
+User will provide their own CFI dataset download when home for accurate profiling.
+Current statistics in docs/ are from live SODA API (July 3, 2026, 312,740 rows) and
+should be re-run on the provided snapshot before finalizing the Phase-I PDF.
+
+### When dataset is provided, re-run:
+1. scripts/profile_cfi.py on the CSV → update null counts, duplicates, U1 scope
+2. queries/profiling-queries.txt B1-B8 on local SQLite/Postgres load
+3. Update counts in phase1-step1, phase1-step3 if materially different
+4. Capture OpenRefine screenshots from the actual file
+5. Note download date + row count in report header
+
+### How to provide
+- Upload CSV to workspace, or share Box/Google Drive link
+- Include download date if known
