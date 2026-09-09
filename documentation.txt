@@ -45,3 +45,10 @@ Files:
 Run examples:
   make build
   make run file=testdata/rast-gray.txt
+
+2026-09-09 — Zip packaging
+--------------------------
+Created submission zip (code + Makefile only, as the grading server supplies
+test files) and a fuller zip that also includes testdata/ for local runs:
+  /opt/cursor/artifacts/rasterizer-mp.zip
+  /opt/cursor/artifacts/rasterizer-mp-with-testdata.zip
