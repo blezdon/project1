@@ -1,0 +1,47 @@
+CS 418 Rasterizer MP — implementation log
+==========================================
+
+2026-09-09 — Initial implementation
+-----------------------------------
+Built a Python software rasterizer matching the WebGL-inspired input language
+from the Rasterizer MP.
+
+Core pipeline:
+- Parse keywords line-by-line; draw commands use current GPU-like state.
+- Attribute buffers: position (2/3/4), color (3/4), texcoord (2), pointsize (1),
+  elements; missing components filled as (0,0,0,1).
+- Perspective divide by w, viewport map x,y from [-1,1] to pixel space
+  (y=-1 top, y=+1 bottom), then DDA edge walk in y + scanline DDA in x.
+- DDA follows course pseudocode: ceil offset, step with sd=1, loop while pd < bd
+  (half-open edges for abutting triangles).
+- PNG bytes use floor(c*255) after optional sRGB encode (matches references).
+
+Electives included in this build:
+- elements / drawElementsTriangles
+- depth (GL_LESS vs +inf clear)
+- sRGB encode on RGB at PNG write only; textures decoded sRGB→linear on load
+- hyp (hyperbolic / perspective-correct attribute interpolation)
+- frustum (homogeneous clip, six planes, per-plane triangle clip → 0–2 tris)
+- cull (keep visually CCW screen-space winding, cross < 0 with y-down)
+- fsaa N (render N×N subpixels; resolve via premultiplied average)
+- color 4 alpha: non-premultiplied over (rgb weighted by alpha, divide by out_a)
+- uniformMatrix (column-major 4×4 × position)
+- position 2 / position 3
+- texture + texcoord (nearest with round-to-nearest texel, wrap)
+- pointsize + drawArraysPoints (screen-space squares, PointCoord UVs)
+- decals (texture over vertex color per assignment fragment shader)
+
+Reference comparison (course zip under testdata/):
+- Exact match: gray, smallgap, smoothcolor, checkers, depth, elements,
+  sRGB, gammabox, perspective, matrix, 2d3d, cull, fsaa2, fsaa8
+- Off-by-at-most-1 channel: frustum (border rounding), alpha (1 px), decals
+- Texel-shift / clip-border tolerance: textures, points, manyclip (per PDF notes)
+
+Files:
+- rasterizer.py — main program
+- Makefile — `make build` / `make run file=...`
+- testdata/ — course reference inputs/outputs (for local compare)
+
+Run examples:
+  make build
+  make run file=testdata/rast-gray.txt
